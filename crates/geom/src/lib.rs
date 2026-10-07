@@ -11,6 +11,7 @@ mod bounds;
 mod curve;
 mod intersect;
 mod mat;
+pub mod region;
 mod spline;
 mod vec;
 

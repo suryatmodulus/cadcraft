@@ -1,9 +1,12 @@
 //! The command registry. Ids are AutoCAD command names in lower case; menu paths follow
 //! AutoCAD's menu bar so the catalog doubles as the parity metric.
 
+mod annotate;
+mod blocks;
 mod draw;
 mod edit;
 pub mod file;
+mod hatch;
 mod inquiry;
 mod layer;
 mod modify;
@@ -139,6 +142,9 @@ pub fn command_specs() -> &'static [CommandSpec] {
         v.extend(edit::specs());
         v.extend(view::specs());
         v.extend(draw::specs());
+        v.extend(annotate::specs());
+        v.extend(hatch::specs());
+        v.extend(blocks::specs());
         v.extend(modify::specs());
         v.extend(layer::specs());
         v.extend(props::specs());

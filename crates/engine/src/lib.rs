@@ -243,6 +243,8 @@ pub struct Session {
     pub clipboard_base: Vec2,
     pub pending_window: Option<PendingWindow>,
     pub untitled_counter: u32,
+    /// The last dimension created (DIMCONTINUE / DIMBASELINE).
+    pub last_dim: Option<Handle>,
 }
 
 impl Default for Session {
@@ -273,6 +275,7 @@ impl Session {
             clipboard_base: Vec2::ZERO,
             pending_window: None,
             untitled_counter: 0,
+            last_dim: None,
         }
     }
     pub fn new_drawing(&mut self, metric: bool) -> usize {

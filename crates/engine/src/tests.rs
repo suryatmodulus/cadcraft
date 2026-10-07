@@ -322,3 +322,101 @@ fn osnap_toggle() {
     s.execute("osnap", &json!({"on": false})).unwrap();
     assert!(s.settings.osmode & snap::mode::OFF != 0);
 }
+
+#[test]
+fn dimlinear_interactive_and_continue() {
+    let mut s = Session::new();
+    s.cmdline("dimlinear 0,0 10,0 5,2").unwrap();
+    assert!(s.running.is_none());
+    s.cmdline("dimcontinue 25,0").unwrap();
+    s.cmdline("").unwrap();
+    let dims: Vec<_> =
+        s.doc().unwrap().model.iter().filter_map(|e| if let EntityKind::Dimension(d) = &e.kind { Some(d.clone()) } else { None }).collect();
+    assert_eq!(dims.len(), 2);
+    assert!(dims[1].p13.xy().near(Vec2::new(10.0, 0.0), 1e-9));
+    assert!(dims[1].p14.xy().near(Vec2::new(25.0, 0.0), 1e-9));
+    assert!(s.log.iter().any(|l| l.contains("Dimension text = 10.0000")));
+}
+
+#[test]
+fn dim_auto_vertical_and_radius() {
+    let mut s = Session::new();
+    s.execute("dimlinear", &json!({"p1": [0, 0], "p2": [3, 8], "at": [6, 4]})).unwrap();
+    let c = s.execute("circle", &json!({"center": [20, 0], "radius": 2})).unwrap();
+    s.execute("dimradius", &json!({"handle": c["handle"], "at": [23, 1]})).unwrap();
+    let d = s.doc().unwrap();
+    let kinds: Vec<_> = d.model.iter().filter_map(|e| if let EntityKind::Dimension(d) = &e.kind { Some(d.kind) } else { None }).collect();
+    assert!(matches!(kinds[0], cadcraft_doc::DimKind::Linear { rotation } if (rotation - std::f64::consts::FRAC_PI_2).abs() < 1e-12));
+    assert!(matches!(kinds[1], cadcraft_doc::DimKind::Radius));
+}
+
+#[test]
+fn hatch_by_pick_point_with_island() {
+    let mut s = Session::new();
+    s.execute("rectang", &json!({"p1": [0, 0], "p2": [10, 10]})).unwrap();
+    s.execute("circle", &json!({"center": [5, 5], "radius": 2})).unwrap();
+    s.cmdline("hatch 1,1").unwrap();
+    s.cmdline("").unwrap();
+    let h = s.doc().unwrap().model.iter().find_map(|e| if let EntityKind::Hatch(h) = &e.kind { Some(h.clone()) } else { None }).unwrap();
+    assert_eq!(h.loops.len(), 2, "outer boundary plus the circle island");
+    // Hatches go to the back of the draw order.
+    assert!(matches!(s.doc().unwrap().model.iter().next().unwrap().kind, EntityKind::Hatch(_)));
+    // No boundary → error message, no hatch.
+    let mut s2 = Session::new();
+    s2.execute("line", &json!({"points": [[0, 0], [5, 0]]})).unwrap();
+    assert!(s2.execute("hatch", &json!({"points": [[1, 1]]})).is_err());
+}
+
+#[test]
+fn hatch_from_overlapping_lines() {
+    let mut s = Session::new();
+    s.execute("line", &json!({"points": [[-1, 0], [11, 0]]})).unwrap();
+    s.execute("line", &json!({"points": [[10, -1], [10, 6]]})).unwrap();
+    s.execute("line", &json!({"points": [[11, 5], [-1, 5]]})).unwrap();
+    s.execute("line", &json!({"points": [[0, 6], [0, -1]]})).unwrap();
+    let r = s.execute("boundary", &json!({"points": [[3, 3]]})).unwrap();
+    assert_eq!(r["handles"].as_array().unwrap().len(), 1);
+    let area = s.execute("area", &json!({"handle": r["handles"][0]})).unwrap();
+    assert!((area["area"].as_f64().unwrap() - 50.0).abs() < 1e-6);
+}
+
+#[test]
+fn block_insert_with_attributes() {
+    let mut s = Session::new();
+    s.execute("circle", &json!({"center": [0, 0], "radius": 1})).unwrap();
+    s.execute("attdef", &json!({"tag": "TAG", "prompt": "Tag?", "default": "A1", "at": [1.2, 0]})).unwrap();
+    s.execute("selectall", &json!({})).unwrap();
+    s.cmdline("block").unwrap();
+    s.cmdline("Valve").unwrap();
+    s.cmdline("0,0").unwrap(); // pickfirst selection used
+    assert!(s.running.is_none());
+    assert!(s.doc().unwrap().block("Valve").is_some());
+    assert_eq!(s.doc().unwrap().model.len(), 1, "originals converted to one insert");
+    s.cmdline("insert Valve 10,0 2 90 V-101").unwrap();
+    let ins: Vec<_> =
+        s.doc().unwrap().model.iter().filter_map(|e| if let EntityKind::Insert(i) = &e.kind { Some(i.clone()) } else { None }).collect();
+    assert_eq!(ins.len(), 2);
+    assert_eq!(ins[1].attribs[0].text.value, "V-101");
+    assert!((ins[1].scale.x - 2.0).abs() < 1e-12);
+    // Explode the scaled insert back into geometry.
+    let h = s.doc().unwrap().model.last().unwrap().handle;
+    s.execute("explode", &json!({"handles": [h.hex()]})).unwrap();
+    assert!(s.doc().unwrap().model.iter().any(|e| matches!(&e.kind, EntityKind::Circle(c) if (c.radius - 2.0).abs() < 1e-9)));
+    // PURGE keeps the used block.
+    s.execute("purge", &json!({})).unwrap();
+    assert!(s.doc().unwrap().block("Valve").is_some());
+}
+
+#[test]
+fn mleader_and_qdim() {
+    let mut s = Session::new();
+    s.cmdline("mleader 0,0 3,2").unwrap();
+    s.cmdline("NOTE A").unwrap();
+    assert!(
+        s.doc().unwrap().model.iter().any(|e| matches!(&e.kind, EntityKind::MLeader(m) if m.text.as_ref().is_some_and(|t| t.contents == "NOTE A")))
+    );
+    s.execute("line", &json!({"points": [[0, 0], [4, 0], [9, 0]]})).unwrap();
+    let hs: Vec<String> = s.doc().unwrap().model.iter().filter(|e| matches!(e.kind, EntityKind::Line(_))).map(|e| e.handle.hex()).collect();
+    let r = s.execute("qdim", &json!({"handles": hs, "at": [0, -2]})).unwrap();
+    assert_eq!(r["handles"].as_array().unwrap().len(), 2);
+}

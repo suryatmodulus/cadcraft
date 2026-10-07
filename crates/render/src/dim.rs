@@ -84,8 +84,20 @@ pub fn dimension_geometry(d: &Dimension, st: &DimStyle, dimscale: f64) -> DimGeo
             let inside = meas > 2.0 * asz + 1e-9;
             let u = (f2 - f1).normalized();
             let u = if u == Vec2::ZERO { dir } else { u };
+            // Text centred in the dimension line (DIMTAD 0) breaks the line around it.
+            let centred = st.text_above == 0 && !d.user_text_pos && !g.value.is_empty();
+            let horizontal = st.text_inside_horizontal && centred;
+            let tw = cadcraft_fonts::line_width(&g.value, th, 1.0);
+            // Extent of the text along the dimension line (rotated text box projected on u).
+            let along = if horizontal { (tw * u.x.abs() + th * u.y.abs()) / 2.0 } else { tw / 2.0 } + gap;
             if inside {
-                g.lines.push(vec![f1, f2]);
+                let m = f1.mid(f2);
+                if centred && meas > 2.0 * along + 2.0 * asz {
+                    g.lines.push(vec![f1, m - u * along]);
+                    g.lines.push(vec![m + u * along, f2]);
+                } else {
+                    g.lines.push(vec![f1, f2]);
+                }
                 g.fills.push(arrow(f1, -u, asz));
                 g.fills.push(arrow(f2, u, asz));
             } else {
@@ -93,7 +105,7 @@ pub fn dimension_geometry(d: &Dimension, st: &DimStyle, dimscale: f64) -> DimGeo
                 g.fills.push(arrow(f1, u, asz));
                 g.fills.push(arrow(f2, -u, asz));
             }
-            text_angle = u.angle();
+            text_angle = if horizontal { 0.0 } else { u.angle() };
             if text_angle > std::f64::consts::FRAC_PI_2 + 1e-9 && text_angle <= 3.0 * std::f64::consts::FRAC_PI_2 + 1e-9 {
                 text_angle -= std::f64::consts::PI;
             }
@@ -193,7 +205,11 @@ pub fn dimension_geometry(d: &Dimension, st: &DimStyle, dimscale: f64) -> DimGeo
             center_pt,
             Some(center_pt),
             th,
-            if st.text_inside_horizontal && !matches!(d.kind, DimKind::Linear { .. } | DimKind::Aligned) { 0.0 } else { text_angle },
+            if st.text_inside_horizontal && !matches!(d.kind, DimKind::Linear { .. } | DimKind::Aligned | DimKind::Ordinate { .. }) {
+                0.0
+            } else {
+                text_angle
+            },
             1.0,
             0.0,
             cadcraft_fonts::Align::Middle,

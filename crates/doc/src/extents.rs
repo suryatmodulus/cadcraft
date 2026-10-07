@@ -68,9 +68,20 @@ pub fn entity_bounds(d: &Drawing, e: &Entity, depth: usize) -> Bounds2 {
             b
         }
         EntityKind::Dimension(dm) => {
-            let mut b = Bounds2::from_points(
-                [dm.defpt.xy(), dm.text_mid.xy(), dm.p13.xy(), dm.p14.xy()].into_iter().filter(|p| *p != Vec2::ZERO || dm.defpt.xy() == Vec2::ZERO),
-            );
+            let pts: Vec<Vec2> = match dm.kind {
+                crate::DimKind::Linear { .. } | crate::DimKind::Aligned | crate::DimKind::ArcLength => vec![dm.defpt.xy(), dm.p13.xy(), dm.p14.xy()],
+                crate::DimKind::Radius | crate::DimKind::Diameter => vec![dm.defpt.xy(), dm.p15.xy()],
+                crate::DimKind::Angular3P => vec![dm.defpt.xy(), dm.p13.xy(), dm.p14.xy(), dm.p15.xy()],
+                crate::DimKind::Angular => vec![dm.defpt.xy(), dm.p13.xy(), dm.p14.xy(), dm.p15.xy(), dm.p16.xy()],
+                crate::DimKind::Ordinate { .. } => vec![dm.p13.xy(), dm.p14.xy()],
+            };
+            let mut b = Bounds2::from_points(pts);
+            if dm.user_text_pos {
+                b.add(dm.text_mid.xy());
+            }
+            // Room for text and arrows.
+            let th = d.dim_style(&dm.style).map(|s| s.text_height * s.scale.max(1e-9)).unwrap_or(0.18) * d.header.f64("DIMSCALE", 1.0).max(1e-9);
+            b = b.expand(th * 2.5);
             if let Some(blk) = dm.block.as_ref().and_then(|n| d.block(n))
                 && depth < MAX_BLOCK_DEPTH
             {
