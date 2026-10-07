@@ -1,3 +1,10 @@
 *~
-plan/
-plans/
+/target
+/plan/
+/plans/
+/dist/
+/log/
+/temp/
+.DS_Store
+*.swp
+/apps/cadcraft-web/dist/
