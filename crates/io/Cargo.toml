@@ -13,5 +13,6 @@ cadcraft-geom = { workspace = true }
 cadcraft-color = { workspace = true }
 cadcraft-doc = { workspace = true }
 cadcraft-dxf = { workspace = true }
+cadcraft-dwg = { workspace = true }
 cadcraft-render = { workspace = true }
 thiserror = { workspace = true }

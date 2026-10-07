@@ -24,8 +24,9 @@ fn ext(name: &str) -> String {
 
 /// Read a drawing; the format comes from the content (DXF ASCII/binary) or the name.
 pub fn read(bytes: &[u8], name: &str) -> Result<Drawing> {
-    if bytes.starts_with(b"AC10") {
-        return Err(IoError::Unsupported("DWG (reading .dwg is on the roadmap; save as DXF for now)".into()));
+    if cadcraft_dwg::is_dwg(bytes) {
+        let dxf = cadcraft_dwg::dwg_to_dxf(bytes).map_err(IoError::Format)?;
+        return dxf_read::read(&dxf);
     }
     match ext(name).as_str() {
         "dxf" | "" => dxf_read::read(bytes),
@@ -37,7 +38,8 @@ pub fn read(bytes: &[u8], name: &str) -> Result<Drawing> {
 /// Write a drawing in the format chosen by the name's extension.
 pub fn write(d: &Drawing, name: &str) -> Result<Vec<u8>> {
     match ext(name).as_str() {
-        "dxf" | "dwg" | "" => Ok(dxf_write::write(d).into_bytes()),
+        "dxf" | "" => Ok(dxf_write::write(d).into_bytes()),
+        "dwg" => cadcraft_dwg::dxf_to_dwg(dxf_write::write(d).as_bytes()).map_err(IoError::Format),
         "svg" => Ok(svg::export(d, &Space::Model).into_bytes()),
         "png" => png(d, &Space::Model, 2400, 1600),
         e => Err(IoError::Unsupported(e.to_string())),

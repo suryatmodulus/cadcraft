@@ -67,8 +67,9 @@
   line, prompts with clickable `[Keywords]`, AutoComplete, object snaps, polar tracking, ortho,
   direct distance entry, window and crossing selection, grips, and right-click-to-repeat behave
   the way decades of drafting habit expect.
-- **Open files.** DXF is read and written natively (ASCII and binary, R12 through 2018); DWG is
-  on the roadmap. Export to SVG and PNG today.
+- **Open files.** DXF is read and written natively (ASCII and binary, R12 through 2018), and DWG
+  files (R13 through 2018) open and save through the open-source acadrust library. Export to SVG
+  and PNG today.
 - **Fast and native.** Pure Rust and egui, no Electron, no web view. One binary on macOS
   (universal), Windows, Linux and FreeBSD, plus a WebAssembly build for the browser.
 - **Built for agents.** Every menu item, tool and prompt is a command. Agents can type at the
@@ -91,7 +92,7 @@ numbers):
 | Layers & properties | Layers palette and Layer Properties Manager (on/off, freeze, lock, plot, colour, linetype), layer tools (isolate, freeze, off, lock, match, previous), Properties palette with per-object editing, linetypes, lineweights, colour index and true colour |
 | Annotation | Dimensions (linear, aligned, radius, diameter, angular, ordinate, arc length) rendered from DIMSTYLE settings, our own single-stroke drafting font, `%%d %%p %%c` codes, MTEXT wrapping and attachment |
 | Hatch & blocks | Pattern and solid hatches with our own pattern library, block references with attributes and nested blocks |
-| Files | DXF read/write, SVG and PNG export |
+| Files | DXF read/write (R12–2018), DWG read/write (R13–2018, via the acadrust library), SVG and PNG export |
 | Automation | MCP server, JSON control channel, `cadcraft-cli` (info, convert, run, commands, mcp) |
 
 ## Quick start
